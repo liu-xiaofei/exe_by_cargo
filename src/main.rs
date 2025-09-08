@@ -419,13 +419,17 @@ fn test_string_find(){
     //检索操作
     {
         let s2 = String::from("this is s2");
-        let index = s2.find("s2");
+        let index = s2.find("s2");//find返回的是Option<usize> option是一个枚举值,后面枚举会说明
         // println!("查找操作后: '{}'", index);//打印10  注意这里Option<usize> 需要解包  不能直接打印  解包后可以打印
         if let Some(index) = index{
             println!("查找操作后: '{}'", index);
         }else{
             println!("查找操作后: '{}'", "没有找到");
         }
+
+        let index_2: usize = s2.find("s3").unwrap_or(0);//unwrap_or(0) 也解包  如果解包失败,则返回0
+        println!("s2.find(\"s3\").unwrap_or(0) 查找操作后: '{}'", index_2);
+
 
         let index = s2.rfind("s2");
         if let Some(index) = index{
