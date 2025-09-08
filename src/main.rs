@@ -446,3 +446,6 @@ fn test_string_find(){
     // let index = s2.rfind("s2");
     // println!("查找操作后: '{}'", index);
 }
+
+//测试github远程仓库是否完全同步,还是只同步我手动远程的
+
