@@ -1,5 +1,5 @@
 #![allow(dead_code)] //允许未使用的代码  注意这里全局有效的情况下,需要加!
-#![allow(unused_variables)] //允许未使用的变量
+#![allow(unused_variables)] //告诉编译器忽略未使用的变量，不要抛出 warning 警告
 
 //下面的属性可以屏蔽警告,需要放到指定代码前面
 // #[allow(dead_code)] //允许未使用的代码 注意这里全局有效的情况下,需要加!
@@ -22,13 +22,60 @@
 // #[allow(unused_references)] //允许未使用的引用
 // #[allow(unused_results)] //允许未使用的结果
 
-fn main() {
-    println!("Hello, world!");
+// use exe_by_cargo::eat_at_restaurant;
+// use exe_by_cargo::front_of_house; //一般不这样使用,而是函数进行封装
+// use exe_by_cargo::front_of_house::hosting;
+// use exe_by_cargo::serving;
 
-    test_string_find();
-    
-    
+// mod front_of_house;
+// pub use crate::front_of_house::front_of_house::hosting;//正确
+// // pub use crate::front_of_house::serving;错误 1: 提示serving是私有的数据  2.路径错误
+// pub use crate::front_of_house::serving2;
+// pub use crate::front_of_house::hosting2;
+
+/*
+机制是直接从lib.rs中找这函数和模块
+函数:use exe_by_cargo::eat_at_restaurant;
+作用：从 exe_by_cargo 包（即你的 lib.rs）中导入 eat_at_restaurant 函数
+机制：直接在 lib.rs 的根级别查找 pub fn eat_at_restaurant() 函数
+路径：lib.rs → pub fn eat_at_restaurant
+
+模块:use exe_by_cargo::hosting;
+作用：从 exe_by_cargo 包中导入 hosting 模块
+机制：查找 lib.rs 中通过 pub use 重新导出的模块
+路径：lib.rs → pub use crate::front_of_house::hosting → hosting 模块
+
+*/
+use exe_by_cargo::eat_at_restaurant;//从 exe_by_cargo 包（即你的 lib.rs）中导入 eat_at_restaurant 函数
+use exe_by_cargo::hosting;  // ← 正确的导入方式
+// use crate::front_of_house::hosting2;crate::root下没有发现front_of_house-->lib.rs中没有开放这个模块
+use exe_by_cargo::hosting2;
+// use exe_by_cargo::serving;  // ← 正确的导入方式 私有数据
+
+fn main() {
+    println!("enter main function");
+    test_private_module_reference();
+
+    hosting::add_to_waitlist();
 }
+
+/*
+测试私有化模块引用
+*/
+fn test_private_module_reference(){
+    eat_at_restaurant();//调用库函数(这个函数引用了前厅模块)
+    // 绝对路径
+    hosting::add_to_waitlist();//直接调用模块  crate:: 表示从包根开始
+    //都处于包根 crate 中，因此相对路径可以使用 front_of_house 作为开头
+    // exe_by_cargo::front_of_house::hosting2::add_to_waitlist();这句话错误,是因为lib.rs中没开放这个模块;
+    hosting2::add_to_waitlist();//相对路径  front_of_house:: 表示从当前模块开始  
+
+}
+
+
+
+
+
 /*作用域测试 */
 fn test_scope(){
     {
@@ -396,6 +443,7 @@ fn test_string_change(){
     }
 }
 
+//查找以及替换
 fn test_string_find(){
     // ===== 查找操作 =====
     println!("=== 查找操作 ===");
@@ -414,6 +462,11 @@ fn test_string_find(){
         for w in s1.split_whitespace(){//打印this is s1
             println!("{}", w);
         }
+
+        /*
+        想要准确的从 UTF-8 字符串中获取子串是较为复杂的事情，
+        例如想要从 holla中国人नमस्ते 这种变长的字符串中取出某一个子串，使用标准库你是做不到的。 你需要在 crates.io 上搜索 utf8 来寻找想要的功能。
+         */
     }
 
     //检索操作
@@ -427,26 +480,162 @@ fn test_string_find(){
             println!("查找操作后: '{}'", "没有找到");
         }
 
-        let index_2: usize = s2.find("s3").unwrap_or(0);//unwrap_or(0) 也解包  如果解包失败,则返回0
+        let index_2: usize = s2.find("s2").unwrap_or(0);//unwrap_or(0) 也解包  如果解包失败,则返回0
         println!("s2.find(\"s3\").unwrap_or(0) 查找操作后: '{}'", index_2);
 
-
+        /*
+        find方法从字符串的开头向结尾方向查找（从左到右），返回第一个匹配的子串的起始索引。
+        rfind方法从字符串的结尾向开头方向查找（从右到左），返回最后一个匹配的子串的起始索引。
+         */
         let index = s2.rfind("s2");
         if let Some(index) = index{
-            println!("查找操作后: '{}'", index);
+            println!("rfind查找操作后: '{}'", index);
         }else{
-            println!("查找操作后: '{}'", "没有找到");
+            println!("rfind查找操作后: '{}'", "没有找到");
         }
     }
+    
+    //替换  replace该方法可适用于 String 和 &str 类型
+    {
+        let s3 = String::from("this is s3");
+        let s3_1 = s3.replace("s3", "s3_1");//replace不会修改原字符串,会返回一个新的字符串 并且原来的s3依然可以被使用
+        println!("replace操作前: '{}'", s3);//s3没有更改
+        println!("replace操作后: '{}'", s3_1);
 
-    // let s2 = String::from("this is s2");
-    // let index = s2.find("s2");
-    // println!("查找操作后: '{}'", index);
+        let mut s3 = s3;//这里需要mut,因为replace_range会修改原字符串
+        s3.replace_range(0..3, "abcdefg");//replace_range会修改原字符串,不会返回新的字符串,他的返回是()
+        println!("replace_range操作后: '{}'", s3);
 
-    // let index = s2.rfind("s2");
-    // println!("查找操作后: '{}'", index);
+        //replacen 替换n次
+        s3.push_str(" s3 s3 s3");
+        let s3_2 = s3.replacen("s3", "s3_2", 2);//replacen会修改原字符串,会返回一个新的字符串 并且原来的s3依然可以被使用
+        println!("replacen操作前: '{}'", s3);//'abcdefgs is s3 s3 s3 s3'
+        println!("replacen操作后: '{}'", s3_2);//'abcdefgs is s3_2 s3_2 s3 s3'
+
+    }
+    
+
 }
 
-//测试github远程仓库是否完全同步,还是只同步我手动远程的
-//hh
+//删除操作
+fn test_string_delete()
+{
+    //pop —— 删除并返回字符串的最后一个字符,直接操作原字符串
+    {
+        let mut s1 = String::from("this is s1");
+        println!("pop操作前s1: '{}'", s1);//'this is s1'
+        let last_char = s1.pop();//pop会修改原字符串,会返回一个新的字符串 并且原来的s1依然可以被使用,但是s1已经没有最后一个字符了
+        println!("pop操作后s1: '{}'", s1);//'this is s'
+        println!("pop操作后last_char: '{}'", String::from(last_char.unwrap()));//'1'
+    }
+
+    //remove —— 删除并返回指定位置的字符,直接操作原字符串
+    //remove() 方法是按照字节来处理字符串的，如果参数所给的位置不是合法的字符边界，则会发生错误
+    {
+        let mut s2 = String::from("测试中文this is s2");
+        println!("remove操作前s2: '{}'", s2);//'this is s2'
+        let removed_char_ch = s2.remove(0);//注意,remove返回的是char类型,而不是option类型,后面直接打印就好了
+        println!("remove操作后s2: '{}'", s2);//'试中文this is s2'
+        println!("remove操作后removed_char: '{}'", removed_char_ch);//'测'
+
+        //删除第三个汉字
+        let mut s2 = String::from("测试中文this is s2");
+        let removed_char_ch = s2.remove(6);//0是第一个 3是第二个 6是第三个,要符合utf-8编码
+        println!("remove操作后s2: '{}'", s2);//'测试文this is s2'
+        println!("remove操作后removed_char: '{}'", removed_char_ch);//'中'
+
+        // let mut s2 = String::from("测试中文this is s2");
+        // let removed_char_ch = s2.remove(2);//check通过  但是运行会报错,remove方法会按照字节来处理字符串,而不是按照字符来处理字符串
+
+    }
+
+    //truncate —— 删除字符串中从指定位置开始到结尾的全部字符 直接操作原字符串 无返回值
+    {
+        let mut s2 = String::from("this is s2");
+        println!("truncate操作前: '{}'", s2);//'this is s2'
+        s2.truncate(5); //即只保留5个字节,针对中文,也要符合utf-8编码
+        println!("truncate操作后: '{}'", s2);//'this '
+    }
+
+    //clear —— 清空字符串 直接操作原字符串 无返回值
+    {
+        let mut s2 = String::from("this is s2");
+        println!("clear操作前: '{}'", s2);//'this is s2'
+        s2.clear();
+        println!("clear操作后: '{}'", s2);//''
+        println!("clear操作后容量: {}", s2.capacity());//10
+        println!("clear操作后长度: {}", s2.len());//0
+    }
+
+}
+
+/*
+使用 + 或者 += 连接字符串，要求右边的参数必须为字符串的切片引用（Slice）类型。
+其实当调用 + 的操作符时，相当于调用了 std::string 标准库中的 add() 方法，这里 add() 方法的第二个参数是一个引用的类型。
+fn add(self, s: &str) -> String
+
+因此我们在使用 + 时， 必须传递切片引用类型。不能直接传递 String 类型。但是+=操作符的右面必须是String类型。
+
+*/
+fn test_string_connect()
+{
+    //+ 连接字符串
+    {
+        let string_append = String::from("hello ");
+        let string_rust = String::from("rust");
+        // &string_rust会自动解引用为&str 这里发生了隐式转换
+        let result = string_append + &string_rust;//string_append先拼接,然后交所有权给result
+        let mut result = result + "!"; // `result + "!"` 中的 `result` 是不可变的
+        result += "!!!";
+    
+        println!("连接字符串 + -> {}", result);
+
+        let s1 = String::from("tic");
+        let s2 = String::from("tac");
+        let s3 = String::from("toe");
+        // String = String + &str + &str + &str + &str  这里发生了隐式转换
+        let s = s1 + "-" + &s2 + "-" + &s3;
+        println!("连接字符串 + -> {}", s);
+
+    }
+
+    //+= 连接字符串
+    {
+        let mut s1 = String::from("this is s1");
+        let s2 = String::from("this is s2");
+        s1 += &s2;
+        println!("+=操作后s1: '{}'", s1);
+        println!("+=操作后s2: '{}'", s2);//s2的所有权没有转移,所以s2可以再次使用
+    }
+}
+
+/*
+我们可以通过转义的方式 \ 输出 ASCII 和 Unicode 字符。
+*/
+fn test_string_escape()
+{
+     // 通过 \ + 字符的十六进制表示，转义输出一个字符
+     let byte_escape = "I'm writing \x52\x75\x73\x74!";//Rust的ascii
+     println!("What are you doing\x3F (\\x3F means ?) {}", byte_escape);//注意,双\\表示不转义,打印出来是\x3F
+ 
+     // \u 可以输出一个 unicode 字符
+     let unicode_codepoint = "\u{211D}";//R的unicode
+     let character_name = "\"DOUBLE-STRUCK CAPITAL R\"";
+ 
+     println!(
+         "Unicode character {} (U+211D) is called {}",//Unicode character ℝ (U+211D) is called "DOUBLE-STRUCK CAPITAL R"
+         unicode_codepoint, character_name
+     );
+ 
+     // 换行了也会保持之前的字符串格式
+     // 使用\忽略换行符
+     let long_string = "String literals
+                         can span multiple lines.
+                         The linebreak and indentation here ->\
+                         <- can be escaped too!";//屏蔽了换行符,即-->\\n
+     println!("{}", long_string);
+}
+
+
+
 

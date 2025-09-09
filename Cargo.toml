@@ -1,3 +1,4 @@
+#由我们编辑的项目名称、项目版本、项目作者等。以及项目所需相关依赖。
 [package]
 name = "exe_by_cargo"
 version = "0.1.0"
